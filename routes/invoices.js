@@ -1,6 +1,7 @@
 const express = require("express");
 const ExpressError = require("../expressError")
 const router = express.Router();
+const slugify = require('slugify');
 const db = require("../db");
 
 router.get('/', async ( req, res, next) => {
@@ -45,12 +46,25 @@ router.post('/', async ( req, res, next ) => {
 router.put('/:id', async ( req, res, next ) => {
     try{
         const { id } = req.params;
-        const { amt } = req.body;
-        const resp = await db.query(`UPDATE invoices SET amt = $1 RETURNING *`, [ amt ]);
+        const { amt, paid } = req.body;
+        let resp;
+
+        if(paid === true){
+            resp = await db.query(
+                `UPDATE invoices SET amt = $1, paid = $2 , paid_date = CURRENT_DATE WHERE id = $3 RETURNING *`, 
+                [ amt, paid, id ]
+            );
+        } else if(paid === false) {
+            resp = await db.query(
+                `UPDATE invoices SET amt = $1, paid = $2, paid_date = null WHERE id = $3 RETURNING *`, 
+                [ amt, paid, id ]
+            );
+        }
+
         if(resp.rows === 0){
             throw new ExpressError('Invoice not found', 404);
         };
-
+    
         return res.status(200).json({invoice: resp.rows[0]});
     } catch(err){
         return next(err);
